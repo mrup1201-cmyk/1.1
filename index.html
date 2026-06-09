@@ -2,211 +2,287 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Snake Neo 1.01 Stable</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snake Neo 1.02</title>
+
 <style>
-body{margin:0;background:#050510;color:white;font-family:Arial;overflow:hidden}
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px}
+body{
+margin:0;
+overflow:hidden;
+background:#050510;
+color:#fff;
+font-family:Arial;
+touch-action:none;
+}
+
+canvas{
+display:none;
+background:#0a0a15;
+}
+
+.screen{
+position:fixed;
+inset:0;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+gap:12px;
+}
+
 .hidden{display:none!important}
-button,select{padding:12px 18px;border:none;border-radius:10px}
-canvas{display:none;background:#0a0a15}
-#hud{display:none;position:fixed;top:10px;left:10px}
+
+button,select{
+padding:12px 16px;
+border:none;
+border-radius:10px;
+font-size:16px;
+}
+
+#hud{
+position:fixed;
+top:10px;
+left:10px;
+display:none;
+}
+
+#controls{
+position:fixed;
+bottom:20px;
+left:50%;
+transform:translateX(-50%);
+display:none;
+gap:10px;
+flex-direction:column;
+align-items:center;
+}
+
+.row{
+display:flex;
+gap:10px;
+}
+
+.ctrlBtn{
+width:60px;
+height:60px;
+font-size:20px;
+background:#00ffff;
+}
+
+#menu,#settings{
+z-index:10;
+}
 </style>
 </head>
+
 <body>
 
+<!-- MENU -->
 <div id="menu" class="screen">
-<h1>Snake Neo 1.01 Stable</h1>
-<button id="playBtn">Играть</button>
+<h1>Snake Neo 1.02</h1>
+<button id="play">Играть</button>
 <button id="settingsBtn">Настройки</button>
-<p>Рекорд: <span id="best">0</span></p>
+<div>Рекорд: <span id="best">0</span></div>
 </div>
 
+<!-- SETTINGS -->
 <div id="settings" class="screen hidden">
 <h2>Настройки</h2>
-<select id="controlType">
-<option value="swipe">Свайпы</option>
-<option value="tap">Тапы</option>
+
+<label>Скорость</label>
+<select id="speed">
+<option value="120">Slow</option>
+<option value="90" selected>Normal</option>
+<option value="70">Fast</option>
+<option value="50">Ultra</option>
 </select>
-<button id="saveBtn">Сохранить</button>
-<button id="backBtn">Назад</button>
+
+<button id="save">Сохранить</button>
+<button id="back">Назад</button>
 </div>
 
-<div id="hud">Очки: <span id="score">0</span></div>
+<!-- HUD -->
+<div id="hud">Score: <span id="score">0</span></div>
+
+<!-- CONTROLS (NEW) -->
+<div id="controls">
+<div class="row">
+<button class="ctrlBtn" data-dir="up">↑</button>
+</div>
+<div class="row">
+<button class="ctrlBtn" data-dir="left">←</button>
+<button class="ctrlBtn" data-dir="down">↓</button>
+<button class="ctrlBtn" data-dir="right">→</button>
+</div>
+</div>
+
 <canvas id="game"></canvas>
 
 <script>
-const menu=document.getElementById("menu");
-const settings=document.getElementById("settings");
-const playBtn=document.getElementById("playBtn");
-const settingsBtn=document.getElementById("settingsBtn");
-const saveBtn=document.getElementById("saveBtn");
-const backBtn=document.getElementById("backBtn");
-const controlType=document.getElementById("controlType");
-const bestEl=document.getElementById("best");
-const scoreEl=document.getElementById("score");
-const hud=document.getElementById("hud");
 
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
-function resize(){
- canvas.width=window.innerWidth;
- canvas.height=window.innerHeight;
-}
-resize();
-window.addEventListener("resize",resize);
+canvas.width=innerWidth;
+canvas.height=innerHeight;
 
-let best=Number(localStorage.getItem("best")||0);
+const menu=document.getElementById("menu");
+const settings=document.getElementById("settings");
+const hud=document.getElementById("hud");
+const controls=document.getElementById("controls");
+
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const speedEl=document.getElementById("speed");
+
+let grid=20;
+let snake,food;
+let dx=grid,dy=0;
+let score=0;
+
+let running=false;
+let last=0;
+let speed=90;
+
+let best=localStorage.getItem("best")||0;
 bestEl.textContent=best;
 
-const grid=20;
-let snake=[];
-let food={};
-let dx=grid;
-let dy=0;
-let score=0;
-let running=false;
-let timer=null;
-
 function randomFood(){
- return {
-  x:Math.floor(Math.random()*(canvas.width/grid))*grid,
-  y:Math.floor(Math.random()*(canvas.height/grid))*grid
- };
+return{
+x:Math.floor(Math.random()*canvas.width/grid)*grid,
+y:Math.floor(Math.random()*canvas.height/grid)*grid
+};
 }
 
-function resetGame(){
- snake=[{x:200,y:200}];
- dx=grid;
- dy=0;
- score=0;
- scoreEl.textContent="0";
- food=randomFood();
+function reset(){
+snake=[{x:200,y:200}];
+dx=grid;dy=0;
+score=0;
+scoreEl.textContent=0;
+food=randomFood();
 }
 
 function draw(){
- ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.clearRect(0,0,canvas.width,canvas.height);
 
- ctx.fillStyle="#ff00ff";
- ctx.fillRect(food.x,food.y,grid,grid);
+ctx.fillStyle="#ff00ff";
+ctx.fillRect(food.x,food.y,grid,grid);
 
- ctx.fillStyle="#00ffff";
- snake.forEach(p=>ctx.fillRect(p.x,p.y,grid-2,grid-2));
+ctx.fillStyle="#00ffff";
+snake.forEach(p=>ctx.fillRect(p.x,p.y,grid-2,grid-2));
+}
+
+function loop(t){
+if(!running) return;
+
+if(t-last<speed){
+requestAnimationFrame(loop);
+return;
+}
+last=t;
+
+let head={x:snake[0].x+dx,y:snake[0].y+dy};
+
+if(
+head.x<0||head.y<0||
+head.x>=canvas.width||
+head.y>=canvas.height
+){
+return gameOver();
+}
+
+for(let i=0;i<snake.length;i++){
+if(snake[i].x===head.x&&snake[i].y===head.y){
+return gameOver();
+}
+}
+
+snake.unshift(head);
+
+if(head.x===food.x&&head.y===food.y){
+score++;
+scoreEl.textContent=score;
+food=randomFood();
+}else{
+snake.pop();
+}
+
+draw();
+requestAnimationFrame(loop);
 }
 
 function gameOver(){
- running=false;
- clearInterval(timer);
+running=false;
 
- if(score>best){
-  best=score;
-  localStorage.setItem("best",best);
-  bestEl.textContent=best;
- }
-
- alert("Игра окончена. Счёт: "+score);
-
- canvas.style.display="none";
- hud.style.display="none";
- menu.classList.remove("hidden");
+if(score>best){
+best=score;
+localStorage.setItem("best",best);
+bestEl.textContent=best;
 }
 
-function tick(){
- const head={x:snake[0].x+dx,y:snake[0].y+dy};
-
- if(head.x<0||head.y<0||head.x>=canvas.width||head.y>=canvas.height){
-  gameOver();
-  return;
- }
-
- for(let i=0;i<snake.length;i++){
-  if(head.x===snake[i].x && head.y===snake[i].y){
-   gameOver();
-   return;
-  }
- }
-
- snake.unshift(head);
-
- if(head.x===food.x && head.y===food.y){
-  score++;
-  scoreEl.textContent=score;
-  food=randomFood();
- }else{
-  snake.pop();
- }
-
- draw();
+menu.classList.remove("hidden");
+canvas.style.display="none";
+hud.style.display="none";
+controls.style.display="none";
 }
 
-function startGame(){
- clearInterval(timer);
+function start(){
+if(running) return;
 
- menu.classList.add("hidden");
- settings.classList.add("hidden");
+menu.classList.add("hidden");
+settings.classList.add("hidden");
 
- canvas.style.display="block";
- hud.style.display="block";
+canvas.style.display="block";
+hud.style.display="block";
+controls.style.display="flex";
 
- resetGame();
- draw();
+reset();
 
- running=true;
- timer=setInterval(tick,90);
+running=true;
+last=0;
+requestAnimationFrame(loop);
 }
 
-playBtn.addEventListener("click",startGame);
+document.getElementById("play").onclick=start;
 
-settingsBtn.addEventListener("click",()=>{
- menu.classList.add("hidden");
- settings.classList.remove("hidden");
+document.getElementById("settingsBtn").onclick=()=>{
+menu.classList.add("hidden");
+settings.classList.remove("hidden");
+};
+
+document.getElementById("back").onclick=()=>{
+settings.classList.add("hidden");
+menu.classList.remove("hidden");
+};
+
+document.getElementById("save").onclick=()=>{
+speed=+speedEl.value;
+localStorage.setItem("speed",speed);
+settings.classList.add("hidden");
+menu.classList.remove("hidden");
+};
+
+speed=+(localStorage.getItem("speed")||90);
+
+document.querySelectorAll(".ctrlBtn").forEach(btn=>{
+btn.addEventListener("click",()=>{
+let dir=btn.dataset.dir;
+
+if(dir==="up"&&dy===0){dx=0;dy=-grid;}
+if(dir==="down"&&dy===0){dx=0;dy=grid;}
+if(dir==="left"&&dx===0){dx=-grid;dy=0;}
+if(dir==="right"&&dx===0){dx=grid;dy=0;}
+});
 });
 
-backBtn.addEventListener("click",()=>{
- settings.classList.add("hidden");
- menu.classList.remove("hidden");
+document.addEventListener("keydown",e=>{
+if(e.key==="ArrowUp"&&dy===0){dx=0;dy=-grid;}
+if(e.key==="ArrowDown"&&dy===0){dx=0;dy=grid;}
+if(e.key==="ArrowLeft"&&dx===0){dx=-grid;dy=0;}
+if(e.key==="ArrowRight"&&dx===0){dx=grid;dy=0;}
 });
 
-saveBtn.addEventListener("click",()=>{
- localStorage.setItem("control",controlType.value);
- settings.classList.add("hidden");
- menu.classList.remove("hidden");
-});
-
-let startX=0,startY=0;
-
-document.addEventListener("touchstart",(e)=>{
- startX=e.touches[0].clientX;
- startY=e.touches[0].clientY;
-
- if((localStorage.getItem("control")||"swipe")==="tap"){
-   const w=innerWidth,h=innerHeight;
-
-   if(startY<h*0.33 && dy===0){dx=0;dy=-grid;}
-   else if(startY>h*0.66 && dy===0){dx=0;dy=grid;}
-   else if(startX<w/2 && dx===0){dx=-grid;dy=0;}
-   else if(startX>=w/2 && dx===0){dx=grid;dy=0;}
- }
-});
-
-document.addEventListener("touchend",(e)=>{
- if((localStorage.getItem("control")||"swipe")!=="swipe") return;
-
- const endX=e.changedTouches[0].clientX;
- const endY=e.changedTouches[0].clientY;
-
- const mx=endX-startX;
- const my=endY-startY;
-
- if(Math.abs(mx)>Math.abs(my)){
-   if(mx>20 && dx===0){dx=grid;dy=0;}
-   if(mx<-20 && dx===0){dx=-grid;dy=0;}
- }else{
-   if(my>20 && dy===0){dx=0;dy=grid;}
-   if(my<-20 && dy===0){dx=0;dy=-grid;}
- }
-});
 </script>
+
 </body>
 </html>
