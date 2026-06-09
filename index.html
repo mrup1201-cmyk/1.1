@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snake Neo 1.02 Fixed+</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:#050510;
+color:#fff;
+font-family:Arial;
+touch-action:none;
+}
+
+canvas{
+display:none;
+background:#0a0a15;
+}
+
+.screen{
+position:fixed;
+inset:0;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+gap:12px;
+}
+
+.hidden{display:none!important}
+
+button,select{
+padding:12px 16px;
+border:none;
+border-radius:10px;
+font-size:16px;
+}
+
+#hud{
+position:fixed;
+top:10px;
+left:10px;
+display:none;
+font-size:18px;
+}
+
+/* CONTROL PAD */
+#controls{
+position:fixed;
+bottom:20px;
+left:50%;
+transform:translateX(-50%);
+display:none;
+flex-direction:column;
+align-items:center;
+gap:6px;
+}
+
+.row{
+display:flex;
+gap:6px;
+}
+
+.ctrlBtn{
+width:62px;
+height:62px;
+font-size:22px;
+border-radius:14px;
+
+/* 🔥 30–50% transparency */
+background:rgba(0,255,255,0.35);
+backdrop-filter:blur(6px);
+color:white;
+border:1px solid rgba(0,255,255,0.5);
+}
+
+.ctrlBtn:active{
+transform:scale(0.92);
+background:rgba(0,255,255,0.55);
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- MENU -->
+<div id="menu" class="screen">
+<h1>Snake Neo 1.02</h1>
+<button id="play">Играть</button>
+<button id="settingsBtn">Настройки</button>
+<div>Рекорд: <span id="best">0</span></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="screen hidden">
+<h2>Настройки</h2>
+
+<label>Скорость</label>
+<select id="speed">
+<option value="120">Slow</option>
+<option value="90" selected>Normal</option>
+<option value="70">Fast</option>
+<option value="50">Ultra</option>
+</select>
+
+<label>Управление</label>
+<select id="controlType">
+<option value="buttons">Кнопки</option>
+<option value="swipe">Свайпы</option>
+<option value="tap">Тапы</option>
+</select>
+
+<button id="save">Сохранить</button>
+<button id="back">Назад</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">Score: <span id="score">0</span></div>
+
+<!-- CONTROL PAD -->
+<div id="controls">
+<div class="row">
+<button class="ctrlBtn" data-dir="up">↑</button>
+</div>
+<div class="row">
+<button class="ctrlBtn" data-dir="left">←</button>
+<button class="ctrlBtn" data-dir="down">↓</button>
+<button class="ctrlBtn" data-dir="right">→</button>
+</div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+const menu=document.getElementById("menu");
+const settings=document.getElementById("settings");
+const hud=document.getElementById("hud");
+const controls=document.getElementById("controls");
+
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const speedEl=document.getElementById("speed");
+const controlType=document.getElementById("controlType");
+
+let grid=20;
+let snake,food;
+let dx=grid,dy=0;
+let score=0;
+
+let running=false;
+let last=0;
+let speed=90;
+
+let best=localStorage.getItem("best")||0;
+bestEl.textContent=best;
+
+function resize(){
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+
+function randomFood(){
+return{
+x:Math.floor(Math.random()*canvas.width/grid)*grid,
+y:Math.floor(Math.random()*canvas.height/grid)*grid
+};
+}
+
+function reset(){
+snake=[{x:200,y:200}];
+dx=grid;dy=0;
+score=0;
+scoreEl.textContent=0;
+food=randomFood();
+}
+
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.fillStyle="#ff00ff";
+ctx.fillRect(food.x,food.y,grid,grid);
+
+ctx.fillStyle="#00ffff";
+snake.forEach(p=>ctx.fillRect(p.x,p.y,grid-2,grid-2));
+}
+
+function loop(t){
+if(!running) return;
+
+if(t-last<speed){
+requestAnimationFrame(loop);
+return;
+}
+last=t;
+
+let head={x:snake[0].x+dx,y:snake[0].y+dy};
+
+if(head.x<0||head.y<0||head.x>=canvas.width||head.y>=canvas.height){
+return gameOver();
+}
+
+for(let i=0;i<snake.length;i++){
+if(snake[i].x===head.x&&snake[i].y===head.y){
+return gameOver();
+}
+}
+
+snake.unshift(head);
+
+if(head.x===food.x&&head.y===food.y){
+score++;
+scoreEl.textContent=score;
+food=randomFood();
+}else{
+snake.pop();
+}
+
+draw();
+requestAnimationFrame(loop);
+}
+
+function gameOver(){
+running=false;
+
+if(score>best){
+best=score;
+localStorage.setItem("best",best);
+bestEl.textContent=best;
+}
+
+menu.classList.remove("hidden");
+canvas.style.display="none";
+hud.style.display="none";
+controls.style.display="none";
+}
+
+function applyControls(){
+controls.style.display="none";
+
+const mode=controlType.value;
+
+if(mode==="buttons"){
+controls.style.display="flex";
+}
+
+}
+
+function start(){
+if(running) return;
+
+menu.classList.add("hidden");
+settings.classList.add("hidden");
+
+canvas.style.display="block";
+hud.style.display="block";
+
+reset();
+running=true;
+last=0;
+requestAnimationFrame(loop);
+
+applyControls();
+}
+
+document.getElementById("play").onclick=start;
+
+document.getElementById("settingsBtn").onclick=()=>{
+menu.classList.add("hidden");
+settings.classList.remove("hidden");
+};
+
+document.getElementById("back").onclick=()=>{
+settings.classList.add("hidden");
+menu.classList.remove("hidden");
+};
+
+document.getElementById("save").onclick=()=>{
+speed=+speedEl.value;
+localStorage.setItem("speed",speed);
+localStorage.setItem("control",controlType.value);
+settings.classList.add("hidden");
+menu.classList.remove("hidden");
+};
+
+speed=+(localStorage.getItem("speed")||90);
+controlType.value=localStorage.getItem("control")||"buttons";
+
+document.querySelectorAll(".ctrlBtn").forEach(btn=>{
+btn.addEventListener("click",()=>{
+let d=btn.dataset.dir;
+
+if(d==="up"&&dy===0){dx=0;dy=-grid;}
+if(d==="down"&&dy===0){dx=0;dy=grid;}
+if(d==="left"&&dx===0){dx=-grid;dy=0;}
+if(d==="right"&&dx===0){dx=grid;dy=0;}
+});
+});
+
+</script>
+
+</body>
+</html>
