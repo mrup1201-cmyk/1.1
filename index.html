@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>S6AKE FIX MENU</title>
+
+<style>
+body{
+margin:0;
+background:#050510;
+color:#fff;
+font-family:Arial;
+overflow:hidden;
+touch-action:none;
+}
+
+canvas{display:none;background:#0a0a0a}
+
+.screen{
+position:fixed;
+inset:0;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+gap:10px;
+}
+
+.hidden{display:none!important}
+
+button{
+padding:10px 14px;
+border:none;
+border-radius:10px;
+font-size:14px;
+}
+
+#hud{
+position:fixed;
+top:10px;
+left:10px;
+display:none;
+}
+</style>
+</head>
+
+<body>
+
+<!-- MENU -->
+<div id="menu" class="screen">
+<h1>S6AKE</h1>
+
+<button id="playBtn">Играть</button>
+<button id="settingsBtn">Настройки</button>
+<button id="shopBtn">Кейсы</button>
+<button id="invBtn">Инвентарь</button>
+
+<div>S6Bit: <span id="moneyUI">0</span></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="screen hidden">
+<h2>Настройки</h2>
+<button onclick="closeAll()">Назад</button>
+</div>
+
+<!-- SHOP -->
+<div id="shop" class="screen hidden">
+<h2>Кейсы</h2>
+<button onclick="openCase()">Открыть кейс (5 S6Bit)</button>
+<button onclick="closeAll()">Назад</button>
+<div id="caseLog"></div>
+</div>
+
+<!-- INVENTORY -->
+<div id="inv" class="screen hidden">
+<h2>Инвентарь</h2>
+<div id="invList"></div>
+<button onclick="closeAll()">Назад</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+S6Bit: <span id="money"></span>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+
+const menu=document.getElementById("menu");
+const settings=document.getElementById("settings");
+const shop=document.getElementById("shop");
+const inv=document.getElementById("inv");
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+
+let money=0;
+
+// ===== SKINS =====
+const skins=[
+{id:"s1",name:"херня",color:"#777"},
+{id:"s2",name:"ну такое",color:"#0ff"},
+{id:"s3",name:"нормалды",color:"#00f"},
+{id:"s4",name:"опана",color:"#a0f"},
+{id:"s5",name:"ахуеть",color:"#f80"},
+{id:"s6",name:"ебать копать",color:"#ff0"}
+];
+
+let owned=skins.map(s=>s.id);
+let equipped="s2";
+
+// ===== MENU FIX =====
+function show(screen){
+menu.classList.add("hidden");
+settings.classList.add("hidden");
+shop.classList.add("hidden");
+inv.classList.add("hidden");
+
+screen.classList.remove("hidden");
+}
+
+function closeAll(){
+menu.classList.remove("hidden");
+settings.classList.add("hidden");
+shop.classList.add("hidden");
+inv.classList.add("hidden");
+canvas.style.display="none";
+document.getElementById("hud").style.display="none";
+}
+
+// ===== GAME =====
+let snake,food,dx=20,dy=0,grid=20;
+
+function spawn(){
+return{
+x:Math.floor(Math.random()*canvas.width/grid)*grid,
+y:Math.floor(Math.random()*canvas.height/grid)*grid
+};
+}
+
+function reset(){
+snake=[{x:200,y:200}];
+food=spawn();
+dx=grid;dy=0;
+}
+
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle="#ff00ff";
+ctx.fillRect(food.x,food.y,grid,grid);
+
+ctx.fillStyle=skins.find(s=>s.id===equipped).color;
+snake.forEach(p=>ctx.fillRect(p.x,p.y,grid-2,grid-2));
+}
+
+function loop(){
+requestAnimationFrame(loop);
+}
+
+function startGame(){
+show(menu);
+menu.classList.add("hidden");
+
+canvas.style.display="block";
+document.getElementById("hud").style.display="block";
+
+reset();
+draw();
+}
+
+// ===== CASE =====
+function openCase(){
+let log=document.getElementById("caseLog");
+
+if(money<5){
+log.innerText="нет S6Bit";
+return;
+}
+
+money-=5;
+
+let r=Math.random();
+
+if(r<0.7){
+let s=skins[Math.floor(Math.random()*skins.length)];
+owned.push(s.id);
+log.innerText="выпало: "+s.name;
+}else{
+money+=Math.floor(Math.random()*10)+1;
+log.innerText="S6Bit бонус!";
+}
+
+updateUI();
+renderInv();
+}
+
+// ===== INVENTORY =====
+function renderInv(){
+let el=document.getElementById("invList");
+el.innerHTML="";
+
+skins.forEach(s=>{
+let b=document.createElement("button");
+b.innerText=s.name;
+b.style.background=s.color;
+
+b.onclick=()=>{
+equipped=s.id;
+};
+
+el.appendChild(b);
+});
+}
+
+// ===== UI =====
+function updateUI(){
+document.getElementById("moneyUI").innerText=money;
+document.getElementById("money").innerText=money;
+}
+
+// ===== EVENTS (FIXED) =====
+document.getElementById("playBtn").onclick=startGame;
+
+document.getElementById("settingsBtn").onclick=()=>show(settings);
+document.getElementById("shopBtn").onclick=()=>show(shop);
+document.getElementById("invBtn").onclick=()=>{show(inv);renderInv();};
+
+// init
+updateUI();
+renderInv();
+
+</script>
+
+</body>
+</html>
